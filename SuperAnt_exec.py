@@ -1,5 +1,6 @@
-import sublime, sublime_plugin, sys,os
+import sublime, sublime_plugin, sys, os, re
 from xml.dom.minidom import parseString
+from subprocess import Popen, PIPE
 
 DEFAULT_BUILD_CMD = "exec"
 DEFAULT_BUILD_TASK = "build"
@@ -38,12 +39,11 @@ class SuperAntExecCommand(sublime_plugin.WindowCommand):
             print ex;
             self.window.open_file(os.path.join(package_dir, 'SuperAnt.sublime-settings'));
             return 'The file could not be opened';
-    
+
         self.working_dir = os.path.dirname(self.build);
 
         data = f.read();
         dom = parseString(data);
-        self.targets = dom.getElementsByTagName('target');
 
         # get project name for target prefixing in quick panel
         project_name = None;
@@ -53,12 +53,9 @@ class SuperAntExecCommand(sublime_plugin.WindowCommand):
             # default to folder name if name attribute is not given in project tag
             project_name = os.path.basename(self.working_dir);
 
-        self.targetsList = [];
+        output = Popen(self._ant() + " -p", stdout=PIPE, shell=True, cwd=self.working_dir).stdout.read()
         list_prefix = project_name + ': ';
-        for target in self.targets:
-            targetName = target.getAttributeNode("name").nodeValue;
-            if targetName[0] != "_":
-                self.targetsList.append(list_prefix + targetName);
+        self.targetsList = [list_prefix + re.sub(r'^\s(\w+)\s.*', r'\1', l) for l in output.split('\n') if l.startswith(' ') and not l.startswith(' _')];
 
         if use_sorting:
             self.targetsList = sorted(self.targetsList);
@@ -70,18 +67,19 @@ class SuperAntExecCommand(sublime_plugin.WindowCommand):
 
         self.window.show_quick_panel(self.targetsList, self._quick_panel_callback);
 
+    def _ant(self):
+        # Check for Windows Overrides and Merge
+        if sys.platform.startswith('win32'):
+            return "ant.bat"
+        return "ant"
+
     def _quick_panel_callback(self, index):
 
         if (index > -1):
             targetName = self.targetLookup[index];
             
-            ant = "ant";
-            # Check for Windows Overrides and Merge
-            if sys.platform.startswith('win32'):
-                ant = "ant.bat";
-
             cmd = {
-                'cmd': [ant, "-f", self.build, targetName],
+                'cmd': [self._ant(), "-f", self.build, targetName],
                 'working_dir': self.working_dir
             }
 

@@ -55,7 +55,7 @@ class SuperAntExecCommand(sublime_plugin.WindowCommand):
 
         output = Popen(self._ant() + " -p", stdout=PIPE, shell=True, cwd=self.working_dir).stdout.read()
         list_prefix = project_name + ': ';
-        self.targetsList = [list_prefix + re.sub(r'^\s(\w+)\s.*', r'\1', l) for l in output.split('\n') if l.startswith(' ') and not l.startswith(' _')];
+        self.targetsList = [list_prefix + re.sub(r'^\s(\S+)\s.*', r'\1', l) for l in output.split('\n') if l.startswith(' ') and not l.startswith(' _')];
 
         if use_sorting:
             self.targetsList = sorted(self.targetsList);
